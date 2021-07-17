@@ -2,7 +2,10 @@
 
 A simple program that sets random wallpaper images as desktop backgrounds in Gnome based window managers. It fetches images from a local directory or Unsplash, composes a new image to match display size and arrangement, and sets the new image as the desktop background.
 
+Example arrangement:
 ![Example Arrangement](example_arrangement.png)
+
+Example wallpaper:
 ![Example Wallpaper](example_wallpaper.jpg)
 
 ## Usage
