@@ -2,6 +2,8 @@
 
 A simple program that sets random wallpaper images as desktop backgrounds in Gnome based window managers. It fetches images from a local directory or Unsplash, composes a new image to match display size and arrangement, and sets the new image as the desktop background.
 
+![Example Wallpaper](example_wallpaper.jpg)
+
 ## Configuration
 
 Default configuration can be found in `./gnome_random_wallpaper/config.yaml`. This file can be copied to `$HOME/.config/gnome_random_wallpaper/config.yaml` and modified to override the defaults.
