@@ -7,7 +7,7 @@ A simple program that sets random wallpaper images as desktop backgrounds in Gno
 
 ## Configuration
 
-Default configuration can be found in `./gnome_random_wallpaper/config.yaml`. This file can be copied to `$HOME/.config/gnome_random_wallpaper/config.yaml` and modified to override the defaults.
+Default configuration can be found in [gnome_random_wallpaper/config.yaml](gnome_random_wallpaper/config.yaml). This file can be copied to `$HOME/.config/gnome_random_wallpaper/config.yaml` and modified to override the defaults.
 
 ## Supported display configurations
 
