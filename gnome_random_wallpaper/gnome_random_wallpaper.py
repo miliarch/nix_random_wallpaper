@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 from random import choice
 from requests import get
-from shutil import move, copy
+from shutil import move
 from subprocess import run
 from sys import exit
 from time import sleep
@@ -40,7 +40,7 @@ IMAGE_FORMAT = CONFIG['output_image_format']
 OUTPUT_DIR = Path(CONFIG['output_dir'])
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 TIMESTAMP = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-TEMP_FILE = Path(f'{OUTPUT_DIR}/{TIMESTAMP}.{IMAGE_FORMAT}')
+TEMP_FILE = Path(f'{OUTPUT_DIR}/{TIMESTAMP}_grw_out.{IMAGE_FORMAT}')
 OUTPUT_FILE = Path(f'{OUTPUT_DIR}/{CONFIG["output_image_name"]}')
 
 # Ensure provided IMAGES_DIR, if specified, exists
@@ -179,7 +179,7 @@ def main():
     # Save canvas to temp file
     canvas.save(TEMP_FILE, format=IMAGE_FORMAT)
 
-    # Copy temp file to output file (initial image write is slow)
+    # Move temp file to output file (initial image write is slow)
     move(TEMP_FILE, OUTPUT_FILE)
 
     # Set newly generated image as background

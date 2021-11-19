@@ -14,14 +14,15 @@ A simple program that sets random wallpaper images as desktop backgrounds in Gno
 
 Gnome Random Wallpaper (`grw`) currently makes the following assumptions about the user:
 * The user will configure some external scheduler to prompt the `grw` command to run in the background
-* The user doesn't want to keep the generated wallpaper images forever
-  * The last image to be generated is replaced by the new image
-  * The output directory is `/tmp/random` - `/tmp` is commonly a tmpfs filesystem and exists only in memory (while the system remains on)
-* The user won't change configuration or interact directly with the program often, making command line argument support a low priority
+* The user doesn't usually want to keep the generated wallpaper images forever
+  * The last image that was generated is replaced by the newly generated image
+  * The default output directory is `/tmp/random` - `/tmp` is commonly a tmpfs filesystem and exists only in memory (while the system remains powered on)
+    * Note: The default output directory can and probably should be changed to a non-volatile location in [configuration](#configuration). Specifying a non-volatile directory will prevent temporary auto-selection of a system default wallpaper by the window manager on login after a fresh boot cycle, which can be disorienting.
+* The user won't interact directly with the program often, making command line argument support unnecessary
 
-Simply running `grw` will fetch images from either the [Unsplash API](https://source.unsplash.com/) or the directory you've defined and update your desktop background.
+Simply running `grw` will fetch images from either the [Unsplash API](https://source.unsplash.com/) or the image directory (`images_dir`) defined in configuration, resize and compose the images on a spanned canvas matching your current display arrangement, save the resulting wallpaper image to the output directory (`output_dir`), and update your desktop background.
 
-Some key steps to take in your environment:
+Some suggested steps to take in your environment:
 * Configure a cron job or timer of some sort to run `grw` at regular intervals (every 15 minutes works well for me - `*/15 * * * * /path/to/grw`)
 * Configure a Startup Application to run `grw` on login
 
@@ -32,13 +33,15 @@ Install with pip using a command like:
 pip install git+https://github.com/miliarch/gnome_random_wallpaper.git
 ```
 
-After installation, a `grw` link should land in your `$HOME/.local/bin` directory (this may vary depending on distro - it's accurate for Arch Linux). If this directory is in your path, the `grw` command should work without issue. Otherwise, you'll need to specify the full path.
+After installation, a `grw` executable link should be placed in your `$HOME/.local/bin` directory (this may vary depending on distro). If this directory is included in your PATH environment variable, the `grw` command should be available for use without any further steps. Otherwise, you'll need to either specify the full path to run the program, or add the `$HOME/.local/bin` directory to your PATH environment variable.
 
 Alternatively, clone this repository to your preferred installation directory and manually link `./gnome_random_wallpaper/gnome_wallpaper.py` in the execution directory of your choice.
 
 ## Configuration
 
-Default configuration can be found in [gnome_random_wallpaper/config.yaml](gnome_random_wallpaper/config.yaml). This file can be copied to `$HOME/.config/gnome_random_wallpaper/config.yaml` and modified to override the defaults.
+Default configuration can be found in [gnome_random_wallpaper/config.yaml](gnome_random_wallpaper/config.yaml). This file can copied to `$HOME/.config/gnome_random_wallpaper/config.yaml` and modified to override the default options.
+
+Each configuration option in the file includes an in-line comment that details its function. If you have any questions about how existing options behave, or requests for new options, please raise an issue in this repository.
 
 ## Supported display configurations
 
