@@ -128,16 +128,22 @@ def main():
     # Capture display resolution and arrangement information
     cmd_str = 'xrandr | grep " connected"'
     cmd = run(cmd_str, env=env, shell=True, capture_output=True)
-    displays_raw = cmd.stdout.decode('utf-8').split('\n')[0:-1]
+    displays_raw = cmd.stdout.decode('utf-8').split('\n')
 
     # Generate list of Display object instances
     displays = []
     for dr in displays_raw:
-        if 'primary' in dr:
-            dimensions = dr.split(' ')[3]
-        else:
-            dimensions = dr.split(' ')[2]
-        displays.append(Display(*dimensions.split('+')))
+        if dr:
+            if 'primary' in dr:
+                dimensions = dr.split(' ')[3]
+            else:
+                dimensions = dr.split(' ')[2]
+            displays.append(Display(*dimensions.split('+')))
+
+    # Bail if no displays were instantiated
+    if len(displays) == 0:
+        help_str = 'No displays detected - environment not supported'
+        exit(help_str)
 
     # Sort displays by offset_w (arrangement based on offset, left to right)
     displays.sort(key=lambda x: x.offset_w)
