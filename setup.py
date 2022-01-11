@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
-    name="gnome_random_wallpaper",
-    version="0.2",
+    name="nix_random_wallpaper",
+    version="0.1",
     packages=find_packages(),
     package_data={
         "": ['config.yaml']
@@ -18,14 +18,14 @@ setup(
     ],
     author='Marcus Bowman',
     author_email='miliarch.mb@gmail.com',
-    description='A simple program that sets random wallpaper images as desktop backgrounds in Gnome based window managers.',
+    description='A simple program that sets random wallpaper images as desktop backgrounds in *nix operating systems.',
     license='MIT',
-    keywords='gnome cinnamon random wallpaper desktop background unsplash',
-    url='https://github.com/miliarch/gnome_random_wallpaper',
+    keywords='gnome cinnamon nitrogen linux random wallpaper desktop background unsplash',
+    url='https://github.com/miliarch/nix_random_wallpaper',
     project_urls={
-        'Source Code': 'https://github.com/miliarch/gnome_random_wallpaper',
+        'Source Code': 'https://github.com/miliarch/nix_random_wallpaper',
     },
     entry_points={
-        'console_scripts': ['grw=gnome_random_wallpaper.gnome_random_wallpaper:main']
+        'console_scripts': ['nrw=nix_random_wallpaper.nix_random_wallpaper:main']
     }
 )
