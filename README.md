@@ -37,7 +37,7 @@ pip install git+https://github.com/miliarch/nix_random_wallpaper.git
 
 After installation, a `nrw` executable link should be placed in your `$HOME/.local/bin` directory (this may vary depending on distro). If this directory is included in your PATH environment variable, the `nrw` command should be available for use without any further steps. Otherwise, you'll need to either specify the full path to run the program, or add the `$HOME/.local/bin` directory to your PATH environment variable.
 
-Alternatively, clone this repository to your preferred installation directory and manually link `./nix_random_wallpaper/gnome_wallpaper.py` in the execution directory of your choice.
+Alternatively, clone this repository to your preferred installation directory and manually link `./nix_random_wallpaper/nix_random_wallpaper.py` in the execution directory of your choice.
 
 ## Configuration
 
