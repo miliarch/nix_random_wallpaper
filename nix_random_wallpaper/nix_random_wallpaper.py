@@ -15,42 +15,9 @@ from time import sleep
 # Path configuration
 BASE_DIR = Path(__file__).resolve().parents[0]
 USER_HOME_PATH = Path.home()
-CONFIG_DIR = Path(f"{USER_HOME_PATH}/.config/gnome_random_wallpaper")
+CONFIG_DIR = Path(f"{USER_HOME_PATH}/.config/nix_random_wallpaper")
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_FILE = Path(f'{CONFIG_DIR}/config.yaml')
-
-try:
-    with open(CONFIG_FILE, 'r') as f:
-        CONFIG = yaml.load(f, Loader=yaml.FullLoader)
-except IOError:
-    # Config file doesn't exist - load the default
-    with open(BASE_DIR.joinpath('config.yaml'), 'r') as f:
-        CONFIG = yaml.load(f, Loader=yaml.FullLoader)
-
-# Unsplash configuration
-UNSPLASH = CONFIG['unsplash']
-UNSPLASH_COLLECTIONS = CONFIG['unsplash_collections']
-UNSPLASH_MAX_RESOLUTION_W = CONFIG['unsplash_resolution_w']
-UNSPLASH_MAX_RESOLUTION_H = CONFIG['unsplash_resolution_h']
-UNSPLASH_ORIENTATION = CONFIG['unsplash_orientation']
-
-# File path configuration
-IMAGES_DIR = Path(CONFIG['images_dir']) if CONFIG['images_dir'] else None
-IMAGE_FORMAT = CONFIG['output_image_format']
-OUTPUT_DIR = Path(CONFIG['output_dir'])
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-TIMESTAMP = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-TEMP_FILE = Path(f'{OUTPUT_DIR}/{TIMESTAMP}_grw_out.{IMAGE_FORMAT}')
-OUTPUT_FILE = Path(f'{OUTPUT_DIR}/{CONFIG["output_image_name"]}')
-
-# Ensure provided IMAGES_DIR, if specified, exists
-if IMAGES_DIR:
-    if not IMAGES_DIR.exists() or not IMAGES_DIR.is_dir():
-        help_str = f"IMAGES_DIR is invalid: {IMAGES_DIR}"
-        exit(help_str)
-elif not UNSPLASH:
-    help_str = "No file source specified, check configuration"
-    exit(help_str)
 
 
 class Display:
@@ -60,7 +27,18 @@ class Display:
         self.offset_h = int(offset_h)
 
 
+def calculate_canvas_dimensions(displays):
+    """Calculate canvas dimensions from given Display objects
+
+    Assume a horizontal layout - sum width, largest height (this can be improved)
+    """
+    total_width = sum([d.resolution_w for d in displays])
+    total_height = max(displays, key=lambda x: x.resolution_h).resolution_h
+    return total_width, total_height
+
+
 def calculate_crop_box(display, image):
+    """Calculate crop box for given image based on display dimensions"""
     top_left = 0
     top_right = 0
     bottom_right = display.resolution_w
@@ -80,6 +58,9 @@ def calculate_crop_box(display, image):
 
 
 def calculate_proportional_dimensions(display, image):
+    """Calculate proportional dimensions for given image based on display
+    dimensions
+    """
     adjusted_width = int(display.resolution_h * image.width / image.height)
     adjusted_height = int(display.resolution_w * image.height / image.width)
 
@@ -91,10 +72,92 @@ def calculate_proportional_dimensions(display, image):
     return (display.resolution_w, adjusted_height)
 
 
-def get_unsplash_image(resolution_w=UNSPLASH_MAX_RESOLUTION_W,
-                       resolution_h=UNSPLASH_MAX_RESOLUTION_H,
-                       collections=UNSPLASH_COLLECTIONS,
-                       orientation=UNSPLASH_ORIENTATION):
+def compose_images(displays, images):
+    """Compose images on canvas that spans displays"""
+    total_width, total_height = calculate_canvas_dimensions(displays)
+    canvas = Image.new('RGB', (total_width, total_height))
+    for display in displays:
+        image = images.pop(0)
+        new_dimensions = calculate_proportional_dimensions(display, image)
+        image = image.resize(new_dimensions)
+        image = image.crop(box=calculate_crop_box(display, image))
+        canvas.paste(image, (display.offset_w, display.offset_h))
+    return canvas
+
+
+def ensure_image_source(images_dir, unsplash):
+    """Ensure that at least one valid image source is specified"""
+    if images_dir:
+        if not images_dir.exists() or not images_dir.is_dir():
+            help_str = f"images_dir is invalid: {images_dir}"
+            exit(help_str)
+    elif not unsplash:
+        help_str = "No file source specified, check configuration"
+        exit(help_str)
+
+
+def gather_displays():
+    """Gather and return list of Display objects representing physical
+    displays connected to the system
+    """
+
+    # Capture display resolution and arrangement information
+    cmd_str = 'xrandr | grep " connected"'
+    cmd = run(cmd_str, shell=True, capture_output=True)
+    displays_raw = cmd.stdout.decode('utf-8').split('\n')
+
+    # Build list of Display objects
+    displays = []
+    for dr in displays_raw:
+        if dr:
+            if 'primary' in dr:
+                dimensions = dr.split(' ')[3]
+            else:
+                dimensions = dr.split(' ')[2]
+            displays.append(Display(*dimensions.split('+')))
+
+    # Bail if no displays were instantiated
+    if len(displays) == 0:
+        help_str = 'No displays detected - environment not supported'
+        exit(help_str)
+
+    return displays
+
+
+def gather_random_local_images(displays, images_dir):
+    """Gather collection of random local images to match count of displays"""
+    image_paths = []
+    for i in range(len(displays)):
+        image_paths.append(select_random_child_path(images_dir))
+    return [Image.open(ip) for ip in image_paths]
+
+
+def gather_random_unsplash_images(displays, max_resolution_w, max_resolution_h, collections, orientation):
+    """Gather collection of random unsplash images to match count of displays -
+    each image must be constrained to provided maximum dimensions, unsplash
+    collection name list, and orientation
+    """
+    images = []
+    for idx, display in enumerate(displays):
+        resolution_w = display.resolution_w if max_resolution_w >= display.resolution_w else max_resolution_w
+        resolution_h = display.resolution_h if max_resolution_h >= display.resolution_h else max_resolution_h
+        image = get_unsplash_image(
+            resolution_w,
+            resolution_h,
+            collections,
+            orientation)
+        images.append(image)
+        if idx < len(displays) - 1:
+            # Slow down between requests - unsplash rate limits
+            sleep(1)
+    return images
+
+
+def get_unsplash_image(resolution_w, resolution_h, collections, orientation):
+    """Get image from unsplash of specified dimensions matching provided
+    collection names list and orientation ('landscape', 'portrait') to filter
+    results
+    """
     endpoint = 'https://source.unsplash.com/random'
     resolution = f'{resolution_w}x{resolution_h}'
     orientation = f'orientation={orientation}'
@@ -105,11 +168,26 @@ def get_unsplash_image(resolution_w=UNSPLASH_MAX_RESOLUTION_W,
         return Image.open(BytesIO(response.content))
 
 
+def import_config():
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+    except IOError:
+        # Config file doesn't exist - load the default
+        with open(BASE_DIR.joinpath('config.yaml'), 'r') as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+    return config
+
+
 def select_random_child_path(parent_path):
     return str(choice([x for x in Path(parent_path).glob('*')]))
 
 
-def main():
+def set_wallpaper(wallpaper_setter, image_file_path):
+    wallpaper_setter(image_file_path)
+
+
+def set_wallpaper_gnome(image_file_path):
     # Identify PID of gnome session
     cmd_str = 'pgrep -f "gnome-session" | head -n1'
     cmd = run(cmd_str, shell=True, capture_output=True)
@@ -125,78 +203,88 @@ def main():
     env['DISPLAY'] = ':0'
     env['DBUS_SESSION_BUS_ADDRESS'] = dbus_sba
 
-    # Capture display resolution and arrangement information
-    cmd_str = 'xrandr | grep " connected"'
-    cmd = run(cmd_str, env=env, shell=True, capture_output=True)
-    displays_raw = cmd.stdout.decode('utf-8').split('\n')
-
-    # Generate list of Display object instances
-    displays = []
-    for dr in displays_raw:
-        if dr:
-            if 'primary' in dr:
-                dimensions = dr.split(' ')[3]
-            else:
-                dimensions = dr.split(' ')[2]
-            displays.append(Display(*dimensions.split('+')))
-
-    # Bail if no displays were instantiated
-    if len(displays) == 0:
-        help_str = 'No displays detected - environment not supported'
-        exit(help_str)
-
-    # Sort displays by offset_w (arrangement based on offset, left to right)
-    displays.sort(key=lambda x: x.offset_w)
-
-    # Assume a horizontal layout - sum width, largest height - sorry future me
-    total_width = sum([d.resolution_w for d in displays])
-    total_height = max(displays, key=lambda x: x.resolution_h).resolution_h
-
-    # Stage canvas Image object
-    canvas = Image.new('RGB', (total_width, total_height))
-
-    # Stage Image objects for composition
-    if UNSPLASH:
-        # Fetch unsplash images
-        images = []
-        for idx, display in enumerate(displays):
-            image = get_unsplash_image(
-                resolution_w=display.resolution_w,
-                resolution_h=display.resolution_h)
-            images.append(image)
-            if idx < len(displays) - 1:
-                # Slow down between requests - unsplash rate limits
-                sleep(1)
-    else:
-        # Fetch random image paths
-        image_paths = []
-        for i in range(len(displays)):
-            image_paths.append(select_random_child_path(IMAGES_DIR))
-        images = [Image.open(ip) for ip in image_paths]
-
-    # Process images
-    for display in displays:
-        image = images.pop(0)
-        new_dimensions = calculate_proportional_dimensions(display, image)
-        image = image.resize(new_dimensions)
-        image = image.crop(box=calculate_crop_box(display, image))
-        canvas.paste(image, (display.offset_w, display.offset_h))
-
-    # Save canvas to temp file
-    canvas.save(TEMP_FILE, format=IMAGE_FORMAT)
-
-    # Move temp file to output file (initial image write is slow)
-    move(TEMP_FILE, OUTPUT_FILE)
-
     # Set newly generated image as background
     cmd_list = [
         'gsettings',
         'set',
         'org.gnome.desktop.background',
         'picture-uri',
-        f'file://{str(OUTPUT_FILE)}'
+        f'file://{str(image_file_path)}'
     ]
-    cmd = run(cmd_list, env=env, capture_output=True)
+    run(cmd_list, env=env, capture_output=True)
+
+
+def set_wallpaper_nitrogen(image_file_path):
+    cmd_list = [
+        'nitrogen',
+        '--set-tiled',
+        str(image_file_path)
+    ]
+    run(cmd_list, capture_output=True)
+
+
+def main():
+    # Import config
+    config = import_config()
+
+    # Unsplash configuration
+    unsplash = config['unsplash']
+    unsplash_collections = config['unsplash_collections']
+    unsplash_max_resolution_w = config['unsplash_resolution_w']
+    unsplash_max_resolution_h = config['unsplash_resolution_h']
+    unsplash_orientation = config['unsplash_orientation']
+
+    # File path configuration
+    images_dir = Path(config['images_dir']) if config['images_dir'] else None
+    image_format = config['output_image_format']
+    output_dir = Path(config['output_dir'])
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    temp_file = Path(f'{output_dir}/{timestamp}_nrw_out.{image_format}')
+    output_file = Path(f'{output_dir}/{config["output_image_name"]}')
+
+    # Configure wallpaper setter and function mappings
+    wallpaper_setter = config['wallpaper_setter']
+    wallpaper_setters = {
+        'gnome': set_wallpaper_gnome,
+        'nitrogen': set_wallpaper_nitrogen,
+    }
+
+    # Ensure that image source has been specified
+    ensure_image_source(images_dir, unsplash)
+
+    # Ensure that output_dir exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Gather list of Display objects
+    displays = gather_displays()
+
+    # Sort displays by offset_w (arrangement based on offset, left to right)
+    displays.sort(key=lambda x: x.offset_w)
+
+    # Stage Image objects for composition
+    if unsplash:
+        # Fetch unsplash images
+        images = gather_random_unsplash_images(
+            displays,
+            unsplash_max_resolution_w,
+            unsplash_max_resolution_h,
+            unsplash_collections,
+            unsplash_orientation)
+    else:
+        # Fetch random local image paths
+        images = gather_random_local_images(displays, images_dir)
+
+    # Compose images on canvas
+    canvas = compose_images(displays, images)
+
+    # Save canvas to temp file
+    canvas.save(temp_file, format=image_format)
+
+    # Move temp file to output file (initial image write is slow)
+    move(temp_file, output_file)
+
+    # Set wallpaper
+    set_wallpaper(wallpaper_setters[wallpaper_setter], output_file)
 
 
 if __name__ == '__main__':
