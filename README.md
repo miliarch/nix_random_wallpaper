@@ -32,16 +32,16 @@ Some suggested steps to take in your environment:
 
 Install with pip using a command like:
 ```
-pip install git+https://github.com/miliarch/gnome_random_wallpaper.git
+pip install git+https://github.com/miliarch/nix_random_wallpaper.git
 ```
 
 After installation, a `nrw` executable link should be placed in your `$HOME/.local/bin` directory (this may vary depending on distro). If this directory is included in your PATH environment variable, the `nrw` command should be available for use without any further steps. Otherwise, you'll need to either specify the full path to run the program, or add the `$HOME/.local/bin` directory to your PATH environment variable.
 
-Alternatively, clone this repository to your preferred installation directory and manually link `./gnome_random_wallpaper/gnome_wallpaper.py` in the execution directory of your choice.
+Alternatively, clone this repository to your preferred installation directory and manually link `./nix_random_wallpaper/gnome_wallpaper.py` in the execution directory of your choice.
 
 ## Configuration
 
-Default configuration can be found in [gnome_random_wallpaper/config.yaml](gnome_random_wallpaper/config.yaml). This file can be copied to `$HOME/.config/nix_random_wallpaper/config.yaml` and modified to override the default options.
+Default configuration can be found in [nix_random_wallpaper/config.yaml](nix_random_wallpaper/config.yaml). This file can be copied to `$HOME/.config/nix_random_wallpaper/config.yaml` and modified to override the default options.
 
 Each configuration option in the file includes an in-line comment that details its function. If you have any questions about how existing options behave, or requests for new options, please raise an issue in this repository.
 
