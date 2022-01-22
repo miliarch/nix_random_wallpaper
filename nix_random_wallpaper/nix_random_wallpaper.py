@@ -85,6 +85,24 @@ def compose_images(displays, images):
     return canvas
 
 
+def configure_environment(setter=None):
+    env = environ.copy()
+    env['DISPLAY'] = ':0'
+    if setter == 'gnome':
+        # Identify PID of gnome session
+        cmd_str = 'pgrep -f "gnome-session" | head -n1'
+        cmd = run(cmd_str, shell=True, capture_output=True)
+        pid = int(cmd.stdout.decode('utf-8').replace('\n', ''))
+
+        # Get DBUS_SESSION_BUS_ADDRESS from environment
+        cmd_str = f'grep -z DBUS_SESSION_BUS_ADDRESS /proc/{pid}/environ|cut -d= -f2-'
+        cmd = run(cmd_str, shell=True, capture_output=True)
+        dbus_sba = cmd.stdout.decode('utf-8').replace('\n', '').replace('\x00', '')
+
+        env['DBUS_SESSION_BUS_ADDRESS'] = dbus_sba
+    return env
+
+
 def ensure_image_source(images_dir, unsplash):
     """Ensure that at least one valid image source is specified"""
     if images_dir:
@@ -103,7 +121,7 @@ def gather_displays():
 
     # Capture display resolution and arrangement information
     cmd_str = 'xrandr | grep " connected"'
-    cmd = run(cmd_str, shell=True, capture_output=True)
+    cmd = run(cmd_str, env=configure_environment(), shell=True, capture_output=True)
     displays_raw = cmd.stdout.decode('utf-8').split('\n')
 
     # Build list of Display objects
@@ -188,20 +206,8 @@ def set_wallpaper(wallpaper_setter, image_file_path):
 
 
 def set_wallpaper_gnome(image_file_path):
-    # Identify PID of gnome session
-    cmd_str = 'pgrep -f "gnome-session" | head -n1'
-    cmd = run(cmd_str, shell=True, capture_output=True)
-    pid = int(cmd.stdout.decode('utf-8').replace('\n', ''))
-
-    # Get DBUS_SESSION_BUS_ADDRESS from environment
-    cmd_str = f'grep -z DBUS_SESSION_BUS_ADDRESS /proc/{pid}/environ|cut -d= -f2-'
-    cmd = run(cmd_str, shell=True, capture_output=True)
-    dbus_sba = cmd.stdout.decode('utf-8').replace('\n', '').replace('\x00', '')
-
     # Configure environment
-    env = environ.copy()
-    env['DISPLAY'] = ':0'
-    env['DBUS_SESSION_BUS_ADDRESS'] = dbus_sba
+    env = configure_environment('gnome')
 
     # Set newly generated image as background
     cmd_list = [
@@ -215,12 +221,16 @@ def set_wallpaper_gnome(image_file_path):
 
 
 def set_wallpaper_nitrogen(image_file_path):
+    # Configure environment
+    env = configure_environment('nitrogen')
+
+    # Set newly generated image as background
     cmd_list = [
         'nitrogen',
         '--set-tiled',
         str(image_file_path)
     ]
-    run(cmd_list, capture_output=True)
+    run(cmd_list, env=env, capture_output=True)
 
 
 def main():
