@@ -1,7 +1,10 @@
 from setuptools import setup, find_packages
+from pathlib import Path
+BASE_DIR = Path(__file__).parent
+long_description = (BASE_DIR / "README.md").read_text()
 setup(
-    name="nix_random_wallpaper",
-    version="0.2",
+    name="nrw",
+    version="0.3",
     packages=find_packages(),
     package_data={
         "": ['config.yaml']
@@ -19,6 +22,8 @@ setup(
     author='Marcus Bowman',
     author_email='miliarch.mb@gmail.com',
     description='A simple program that sets random wallpaper images as desktop backgrounds in *nix operating systems.',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     license='MIT',
     keywords='gnome cinnamon nitrogen linux random wallpaper desktop background unsplash',
     url='https://github.com/miliarch/nix_random_wallpaper',
