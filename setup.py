@@ -4,7 +4,7 @@ BASE_DIR = Path(__file__).parent
 long_description = (BASE_DIR / "README.md").read_text()
 setup(
     name="nrw",
-    version="0.4",
+    version="0.5",
     packages=find_packages(),
     package_data={
         "": ['config.yaml']
@@ -31,6 +31,6 @@ setup(
         'Source Code': 'https://github.com/miliarch/nix_random_wallpaper',
     },
     entry_points={
-        'console_scripts': ['nrw=nix_random_wallpaper.nix_random_wallpaper:main']
+        'console_scripts': ['nrw=nrw.nix_random_wallpaper:main']
     }
 )
