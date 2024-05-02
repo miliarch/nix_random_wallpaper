@@ -25,10 +25,11 @@ DISPLAY_INDEPENDENT_IMAGES_SETTERS = ('hyprpaper')
 
 
 class Display:
-    def __init__(self, resolution, offset_w, offset_h):
+    def __init__(self, resolution, offset_w, offset_h, name=None):
         self.resolution_w, self.resolution_h = map(int, resolution.split('x'))
         self.offset_w = int(offset_w)
         self.offset_h = int(offset_h)
+        self.name = name
 
 
 def calculate_canvas_dimensions(displays):
@@ -76,6 +77,15 @@ def calculate_proportional_dimensions(display, image):
     return (display.resolution_w, adjusted_height)
 
 
+def compose_image(display, image):
+    canvas = Image.new('RGB', (display.resolution_w, display.resolution_h))
+    new_dimensions = calculate_proportional_dimensions(display, image)
+    image = image.resize(new_dimensions)
+    image = image.crop(box=calculate_crop_box(display, image))
+    canvas.paste(image, (0, 0))
+    return canvas
+
+
 def compose_images(displays, images):
     """Compose images on canvas that spans displays"""
     total_width, total_height = calculate_canvas_dimensions(displays)
@@ -104,6 +114,15 @@ def configure_environment(setter=None):
         dbus_sba = cmd.stdout.decode('utf-8').replace('\n', '').replace('\x00', '')
 
         env['DBUS_SESSION_BUS_ADDRESS'] = dbus_sba
+    if setter == 'hyprpaper':
+        # instance fe7b748eb668136dd0558b7c8279bfcd7ab4d759_1714609691:
+        cmd = run(['hyprctl', 'instances'], capture_output=True)
+        output = cmd.stdout.decode('utf-8')
+        # critical assumption that the user will only use a single hyprland instance
+        # grab first line of output, isolate signature:, strip :, left with first instance sig
+        instance_signature = output.split('\n')[0].split(' ')[-1].split(':')[0]
+        env = environ
+        env['HYPRLAND_INSTANCE_SIGNATURE'] = instance_signature
     return env
 
 
@@ -146,8 +165,16 @@ def gather_displays_xorg():
     return displays
 
 
-def gather_displays_wayland():
-    raise NotImplementedError
+def gather_displays_wayland(wallpaper_setter):
+    setter_to_cmd = {
+        'hyprpaper': ['hyprctl', 'monitors'],
+    }
+    env = configure_environment(wallpaper_setter)
+    cmd = run(setter_to_cmd[wallpaper_setter], env=env, capture_output=True)
+    output = cmd.stdout.decode('utf-8')
+    if wallpaper_setter == 'hyprpaper':
+        displays = parse_hyprctl_monitors(output)
+    return displays
 
 
 def gather_random_local_images(displays, images_dir):
@@ -205,12 +232,34 @@ def import_config():
     return config
 
 
+def parse_hyprctl_monitors(output):
+    output_by_monitor = output.split('\n\n')[:-1]
+    displays = []
+    for monitor_output in output_by_monitor:
+        data = {}
+        for line in monitor_output.split('\n'):
+            if '\t' not in line and '(ID ' in line:
+                # Monitor DP-2 (ID 1):
+                data['name'] = line.split('Monitor ')[-1].split(' (ID')[0]
+            if ':' not in line and '@' in line:
+                # \t3840x2160@59.99700 at 3840x0
+                data['resolution'] = line.split('@')[0].split('\t')[-1]
+                offset = line.split(' ')[-1].split('x')
+                data['offset_w'], data['offset_h'] = offset
+        display = Display(data['resolution'], data['offset_w'], data['offset_h'], data['name'])
+        displays.append(display)
+    return displays
+
+
 def select_random_child_path(parent_path):
     return str(choice([x for x in Path(parent_path).glob('*')]))
 
 
-def set_wallpaper(wallpaper_setter, image_file_path):
-    wallpaper_setter(image_file_path)
+def set_wallpaper(wallpaper_setter, image_file_path, display_name=None):
+    if not display_name:
+        wallpaper_setter(image_file_path)
+    else:
+        wallpaper_setter(image_file_path, display_name)
 
 
 def set_wallpaper_gnome(image_file_path):
@@ -241,8 +290,18 @@ def set_wallpaper_nitrogen(image_file_path):
     run(cmd_list, env=env, capture_output=True)
 
 
-def set_wallpaper_hyprpaper(image_file_paths):
-    raise NotImplementedError('setting wallpaper with hyprpaper is not yet supported')
+def set_wallpaper_hyprpaper(image_file_path, display_name):
+    # Configure environment
+    env = configure_environment('hyprpaper')
+
+    # Set newly generated image as background
+    command_sequence = [
+        [f'hyprctl hyprpaper preload {image_file_path}'],
+        [f'hyprctl hyprpaper wallpaper "{display_name},{image_file_path}"'],
+        [f'hyprctl hyprpaper unload {image_file_path}'],
+    ]
+    for cmd in command_sequence:
+        run(cmd, env=env, shell=True, capture_output=True)
 
 
 def main():
@@ -261,7 +320,6 @@ def main():
     image_format = config['output_image_format']
     output_dir = Path(config['output_dir'])
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    temp_file = Path(f'{output_dir}/{timestamp}_nrw_out.{image_format}')
 
     # Configure wallpaper setter and function mappings
     wallpaper_setter = config['wallpaper_setter']
@@ -281,7 +339,7 @@ def main():
     if wallpaper_setter in SETTERS_XORG:
         displays = gather_displays_xorg()
     elif wallpaper_setter in SETTERS_WAYLAND:
-        displays = gather_displays_wayland()
+        displays = gather_displays_wayland(wallpaper_setter)
 
     # Sort displays by offset_w (arrangement based on offset, left to right)
     displays.sort(key=lambda x: x.offset_w)
@@ -303,6 +361,10 @@ def main():
         # Compose images on canvas
         canvas = compose_images(displays, images)
 
+        # Configure file paths
+        temp_file = Path(f'{output_dir}/{timestamp}_nrw_out.{image_format}')
+        output_file = Path(f'{output_dir}/{config["output_image_name"]}')
+
         # Save canvas to temp file
         canvas.save(temp_file, format=image_format)
 
@@ -310,14 +372,34 @@ def main():
         move(temp_file, output_file)
 
         # Set wallpaper
-        output_file = Path(f'{output_dir}/{config["output_image_name"]}')
         set_wallpaper(wallpaper_setters[wallpaper_setter], output_file)
     elif wallpaper_setter in DISPLAY_INDEPENDENT_IMAGES_SETTERS:
-        # Save canvases to temp files
-        # Move temp files to output files
-        # Set wallpaper for each display
-        output_file = Path(f'{output_dir}/{config["output_image_name"]}')
-        set_wallpaper(wallpaper_setters[wallpaper_setter], images)
+        for idx, display in enumerate(displays):
+
+            # Configure unique output image name
+            config_output_file_path = Path(config['output_image_name'])
+            base_name = config_output_file_path.stem
+            extension = config_output_file_path.suffix
+            filename = f'{base_name}_{idx}{extension}'
+
+            # Configure file paths
+            temp_file = Path(f'{output_dir}/{timestamp}_nrw_out{extension}')
+            output_file = Path(f'{output_dir}/{filename}')
+
+            # Select image
+            image = images[idx]
+
+            # Compose image on canvas
+            canvas = compose_image(display, image)
+
+            # Save canvas to temp files
+            canvas.save(temp_file, format=image_format)
+
+            # Move temp file to output file
+            move(temp_file, output_file)
+
+            # Set wallpaper
+            set_wallpaper(wallpaper_setters[wallpaper_setter], output_file, display.name)
 
 
 if __name__ == '__main__':
