@@ -8,4 +8,4 @@ images_dir: null  # directory containing images to select from (only needed if u
 output_dir: /tmp/random  # directory for output image; /tmp by default as a common in-memory filesystem
 output_image_name: wallpaper.jpg  # full name of output file (include extension)
 output_image_format: jpeg  # pillow/PIL output image file format (https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html)
-wallpaper_setter: gnome  # back-end used to set wallpaper [gnome|nitrogen]
+wallpaper_setter: gnome  # back-end used to set wallpaper [gnome|nitrogen|hyprpaper]

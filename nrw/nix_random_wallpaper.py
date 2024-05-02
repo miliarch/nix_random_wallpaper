@@ -18,6 +18,10 @@ USER_HOME_PATH = Path.home()
 CONFIG_DIR = Path(f"{USER_HOME_PATH}/.config/nix_random_wallpaper")
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 CONFIG_FILE = Path(f'{CONFIG_DIR}/config.yaml')
+SETTERS_XORG = ('gnome', 'nitrogen')
+SETTERS_WAYLAND = ('hyprpaper')
+DISPLAY_SPANNED_IMAGE_SETTERS = ('gnome', 'nitrogen')
+DISPLAY_INDEPENDENT_IMAGES_SETTERS = ('hyprpaper')
 
 
 class Display:
@@ -114,7 +118,7 @@ def ensure_image_source(images_dir, unsplash):
         exit(help_str)
 
 
-def gather_displays():
+def gather_displays_xorg():
     """Gather and return list of Display objects representing physical
     displays connected to the system
     """
@@ -140,6 +144,10 @@ def gather_displays():
         exit(help_str)
 
     return displays
+
+
+def gather_displays_wayland():
+    raise NotImplementedError
 
 
 def gather_random_local_images(displays, images_dir):
@@ -233,6 +241,10 @@ def set_wallpaper_nitrogen(image_file_path):
     run(cmd_list, env=env, capture_output=True)
 
 
+def set_wallpaper_hyprpaper(image_file_paths):
+    raise NotImplementedError('setting wallpaper with hyprpaper is not yet supported')
+
+
 def main():
     # Import config
     config = import_config()
@@ -250,13 +262,13 @@ def main():
     output_dir = Path(config['output_dir'])
     timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     temp_file = Path(f'{output_dir}/{timestamp}_nrw_out.{image_format}')
-    output_file = Path(f'{output_dir}/{config["output_image_name"]}')
 
     # Configure wallpaper setter and function mappings
     wallpaper_setter = config['wallpaper_setter']
     wallpaper_setters = {
         'gnome': set_wallpaper_gnome,
         'nitrogen': set_wallpaper_nitrogen,
+        'hyprpaper': set_wallpaper_hyprpaper,
     }
 
     # Ensure that image source has been specified
@@ -266,7 +278,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Gather list of Display objects
-    displays = gather_displays()
+    if wallpaper_setter in SETTERS_XORG:
+        displays = gather_displays_xorg()
+    elif wallpaper_setter in SETTERS_WAYLAND:
+        displays = gather_displays_wayland()
 
     # Sort displays by offset_w (arrangement based on offset, left to right)
     displays.sort(key=lambda x: x.offset_w)
@@ -284,17 +299,25 @@ def main():
         # Fetch random local image paths
         images = gather_random_local_images(displays, images_dir)
 
-    # Compose images on canvas
-    canvas = compose_images(displays, images)
+    if wallpaper_setter in DISPLAY_SPANNED_IMAGE_SETTERS:
+        # Compose images on canvas
+        canvas = compose_images(displays, images)
 
-    # Save canvas to temp file
-    canvas.save(temp_file, format=image_format)
+        # Save canvas to temp file
+        canvas.save(temp_file, format=image_format)
 
-    # Move temp file to output file (initial image write is slow)
-    move(temp_file, output_file)
+        # Move temp file to output file (initial image write is slow)
+        move(temp_file, output_file)
 
-    # Set wallpaper
-    set_wallpaper(wallpaper_setters[wallpaper_setter], output_file)
+        # Set wallpaper
+        output_file = Path(f'{output_dir}/{config["output_image_name"]}')
+        set_wallpaper(wallpaper_setters[wallpaper_setter], output_file)
+    elif wallpaper_setter in DISPLAY_INDEPENDENT_IMAGES_SETTERS:
+        # Save canvases to temp files
+        # Move temp files to output files
+        # Set wallpaper for each display
+        output_file = Path(f'{output_dir}/{config["output_image_name"]}')
+        set_wallpaper(wallpaper_setters[wallpaper_setter], images)
 
 
 if __name__ == '__main__':
