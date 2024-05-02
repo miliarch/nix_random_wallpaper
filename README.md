@@ -22,7 +22,7 @@ Nix Random Wallpaper (`nrw`) currently makes the following assumptions about the
     * Note: The default output directory can and probably should be changed to a non-volatile location in [configuration](#configuration). Specifying a non-volatile directory will prevent temporary auto-selection of a system default wallpaper by the window manager on login after a fresh boot cycle, which can be disorienting.
 * The user won't interact directly with the program often, making command line argument support unnecessary
 
-Simply running `nrw` will fetch images from either the [Unsplash API](https://source.unsplash.com/) or the image directory (`images_dir`) defined in configuration, resize and compose the images on a spanned canvas matching your current display arrangement, save the resulting wallpaper image to the output directory (`output_dir`), and update your desktop background.
+Simply running `nrw` will fetch images from either the [Unsplash API](https://source.unsplash.com/) or the image directory (`images_dir`) defined in configuration, then prepare and set the wallpaper based on the configured setter. In xorg, all setters resize and compose the images on a spanned canvas matching your current display arrangement, save the resulting wallpaper image to the output directory (`output_dir`), and update your desktop background. In wayland (currently only hyprland), images are placed on their own right-sized canvases, saved separately, and update the desktop background individually on each screen.
 
 Some suggested steps to take in your environment:
 * Configure a cron job or timer of some sort to run `nrw` at regular intervals (every 15 minutes works well for me - `*/15 * * * * /path/to/nrw`)
@@ -62,13 +62,15 @@ Vertical arrangements, including mixed vertical/horizontal arrangements, are cur
 
 ### Window managers
 
-* Cinnamon 5.0.5-5.0.7
-* awesome v4.3
+* Cinnamon 5.0.5-5.0.7 (xorg)
+* awesome v4.3 (xorg)
+* hyprland v0.39.1 (wayland)
 
 ### Wallpaper setters
 
-* gnome (via gsettings)
-* [nitrogen](https://github.com/l3ib/nitrogen) (recommended)
+* gnome (via gsettings; xorg only)
+* [nitrogen](https://github.com/l3ib/nitrogen) (recommended for xorg)
+* [hyprpaper](https://github.com/hyprwm/hyprpaper) (hyprland/wayland only)
 
 ### Resolutions
 * 1920x1080
@@ -77,3 +79,4 @@ Vertical arrangements, including mixed vertical/horizontal arrangements, are cur
 
 ### Display arrangements
 * Dual monitor, landscape orientation, horizontal arrangement (side-by-side)
+* In hyprland/wayland, images are set independently by active monitor instead of being placed on a large canvas; any arrangement should be supported
