@@ -1,6 +1,6 @@
 [project]
 name = "nrw"
-version = "0.6"
+version = "0.7"
 description = "A simple program that sets random images as desktop wallpaper in *nix operating systems."
 readme = {file = "README.md", content-type = "text/markdown"}
 requires-python = ">=3.7"
